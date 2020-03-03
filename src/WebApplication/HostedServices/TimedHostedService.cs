@@ -24,29 +24,44 @@ namespace WebApplication.HostedServices
             _timer?.Dispose();
         }
 
-        public Task StartAsync(CancellationToken cancellationToken)
+        public async Task StartAsync(CancellationToken cancellationToken)
         {
             _logger.LogInformation("Timed Background Service is starting.");
+
+            cancellationToken.Register(() => _logger.LogInformation("Timed background Service is stopping..."));
 
             _started = DateTime.UtcNow;
             _sw.Start();
 
-            _timer = new Timer(DoWork, null, TimeSpan.Zero,
-                TimeSpan.FromSeconds(10));
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    DoWork();
 
-            return Task.CompletedTask;
+                    await Task.Delay(5000, cancellationToken);
+                }
+            }
+            catch (TaskCanceledException)
+            {
+
+            }
+
+            _logger.LogInformation("Timed Background Service has stopped.");
+
+            //return Task.CompletedTask;
         }
 
         public Task StopAsync(CancellationToken cancellationToken)
         {
-            _logger.LogInformation("Timed Background Service is stopping.");
+            _logger.LogInformation("Timed Background Service is aborting.");
 
             _timer?.Change(Timeout.Infinite, 0);
 
             return Task.CompletedTask;
         }
 
-        private void DoWork(object state)
+        private void DoWork()
         {
             _logger.LogInformation("Timed Background Service is working since {Started:yyyy-MM-dd HH:mm:ss} ({Elapsed:c}).", _started, _sw.Elapsed);
         }
